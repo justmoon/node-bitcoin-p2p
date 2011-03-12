@@ -1,11 +1,11 @@
 var winston = require('winston'); // logging
 
 var Peer = require('./peer').Peer;
-
-var peers = [];
+var Connection = require('./connection').Connection;
 
 var Node = function () {
-
+	this.peers = [];
+	this.connections = [];
 };
 
 Node.prototype.start = function () {
@@ -14,14 +14,18 @@ Node.prototype.start = function () {
 
 Node.prototype.addPeer = function (peer) {
 	if (peer instanceof Peer) {
-		peers.push(peer);
+		this.peers.push(peer);
 		winston.log('Connecting to peer '+peer);
-		peer.createConnection(this);
+		this.addConnection(new Connection(this, peer.createConnection(), peer));
 	} else if ("string" == typeof peer) {
 		this.addPeer(new Peer(peer));
 	} else {
 		throw 'Node.addPeer(): Invalid value provided for peer: "'+peer+'"';
 	}
+};
+
+Node.prototype.addConnection = function (conn) {
+	this.connections.push(conn);
 };
 
 exports.Node = Node;
