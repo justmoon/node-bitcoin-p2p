@@ -7,9 +7,10 @@ var Peer = function (host) {
 
 Peer.prototype.createConnection = function () {
 	var c = net.createConnection(this.port, this.host);
+	return c;
 };
 
-Peer.toString = function () {
+Peer.prototype.toString = function () {
 	return this.host;
 }
 
