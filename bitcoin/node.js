@@ -28,7 +28,7 @@ Node.prototype.addPeer = function (peer) {
 
 Node.prototype.addConnection = function (conn) {
 	this.connections.push(conn);
-	conn.addListener('connect', this.handleConnect.bind(this));
+	conn.addListener('version', this.handleConnect.bind(this));
 };
 
 Node.prototype.handleConnect = function (e) {

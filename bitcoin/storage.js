@@ -57,7 +57,7 @@ var Storage = exports.Storage = function (uri) {
 		ensureGenesisBlock(function (err) {
 			if (err) return callback(err);
 
-			callback(null, [], []); // success
+			callback(null, [genesis_block.hash], []); // success
 		});
 	};
 };

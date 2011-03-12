@@ -2,7 +2,7 @@ var net = require('net');
 
 var Peer = function (host) {
 	this.host = host;
-	this.port = 5900;
+	this.port = 8333;
 };
 
 Peer.prototype.createConnection = function () {
