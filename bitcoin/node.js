@@ -3,9 +3,10 @@ var winston = require('winston'); // logging
 var Peer = require('./peer').Peer;
 var Connection = require('./connection').Connection;
 
-var Node = function () {
+var Node = function (storage) {
 	this.peers = [];
 	this.connections = [];
+	this.storage = storage;
 };
 
 Node.prototype.start = function () {
