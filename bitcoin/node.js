@@ -7,6 +7,8 @@ var Node = function (storage) {
 	this.peers = [];
 	this.connections = [];
 	this.storage = storage;
+	this.nonce = new Buffer('a8deb8a83928aff8', 'hex');
+	this.version = 32001;
 };
 
 Node.prototype.start = function () {
@@ -28,13 +30,54 @@ Node.prototype.addPeer = function (peer) {
 
 Node.prototype.addConnection = function (conn) {
 	this.connections.push(conn);
-	conn.addListener('version', this.handleConnect.bind(this));
+	conn.addListener('verack', this.handleConnect.bind(this));
+	conn.addListener('inv', this.handleInv.bind(this));
+	conn.addListener('block', this.handleBlock.bind(this));
 };
 
 Node.prototype.handleConnect = function (e) {
 	this.storage.getEnds(function (err, heads, tails) {
 		e.conn.sendGetBlocks(heads, '\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0');
+		//e.conn.sendGetAddr();
 	});
+};
+
+Node.prototype.handleInv = function (e) {
+	var invs = e.message.invs;
+	var toCheck = invs.length;
+	var unknownInvs = [];
+	for (var i = 0; i < invs.length; i++) {
+		var method;
+		switch (invs[i].type) {
+		case 1: // Transaction
+			method = 'knowsTransaction';
+			break;
+		case 2: // Block
+			method = 'knowsBlock';
+			break;
+		default: // Unknown type
+			continue;
+		}
+
+		// This will asynchronously check all the blocks and transactions. Finally,
+		// the last callback will trigger the 'getdata' request.
+		this.storage[method](invs[i].hash, (function (err, known) {
+			toCheck--;
+
+			if (err) {
+				winston.error('Node.handleInv(): Could not check inv against storage',
+							  invs[this]);
+			} else {
+				if (!known) unknownInvs.push(invs[this]);
+			}
+
+			if (toCheck == 0 && unknownInvs.length) e.conn.sendGetData(unknownInvs);
+		}).bind(i));
+	}
+};
+
+Node.prototype.handleBlock = function (e) {
+	winston.info('TODO handle block');
 };
 
 exports.Node = Node;

@@ -4,10 +4,10 @@ var crypto = require('crypto');
 var winston = require('winston'); // logging
 var Binary = require('binary');
 
-var magic = '\xF9\xBE\xB4\xD9';
+var magic = new Buffer('F9BEB4D9', 'hex');
 
 function sha256(data) {
-	return crypto.createHash('sha256').update(data).digest('binary');
+	return new Buffer(crypto.createHash('sha256').update(data).digest('binary'), 'binary');
 };
 
 Binary.put.prototype.var_uint = function (i) {
@@ -35,7 +35,18 @@ var Connection = exports.Connection = function (us, socket, peer) {
 	this.us = us;
 	this.socket = socket;
 	this.peer = peer;
-	this.version = 3;
+
+	// The version incoming packages are interpreted as
+	this.recvVer = 0;
+	// The version outgoing packages are sent as
+	this.sendVer = 0;
+
+	// Starting 20 Feb 2012, Version 0.2 is obsolete
+	// This is the same behavior as the official client
+	if (new Date().getTime() > 1329696000000) {
+		this.recvVer = 209;
+		this.sendVer = 209;
+	}
 
 	this.setupHandlers();
 };
@@ -44,10 +55,17 @@ sys.inherits(Connection, events.EventEmitter);
 
 Connection.prototype.setupHandlers = function () {
 	this.socket.addListener('connect', this.handleConnect.bind(this));
-	this.socket.addListener('data', this.handleData.bind(this));
+	this.socket.addListener('data', function (data) {
+		var dumpLen = 35;
+		winston.debug('Recieved '+data.length+' bytes of data '+data.slice(0, dumpLen > data.length ? data.length : dumpLen).toString('hex') + (data.length > dumpLen ? '...' : ''));
+	});
+
+	var parser = Binary.stream(this.socket);
+	this.setupParser(parser, this.handleMessage.bind(this));
 };
 
 Connection.prototype.handleConnect = function () {
+	this.sendVersion();
 	this.emit('connect', {
 		conn: this,
 		socket: this.socket,
@@ -55,17 +73,26 @@ Connection.prototype.handleConnect = function () {
 	});
 };
 
-Connection.prototype.handleData = function (data) {
-	// data is a Buffer
-	winston.info('Received '+data.length+' bytes of data');
-
-	var message = this.parseMessage(data);
-
+Connection.prototype.handleMessage = function (message) {
 	switch (message.command) {
 	case 'version':
-		this.sendMessage('verack', new Buffer([]));
-		this.sendMessage('getaddr', new Buffer([]));
+		if (message.version >= 209) {
+			this.sendMessage('verack', new Buffer([]));
+		}
+		this.sendVer = Math.min(message.version, this.us.version);
+		if (message.version < 209) {
+			this.recvVer = Math.min(message.version, this.us.version);
+		} else {
+			// We won't start expecting a checksum until after we've received
+			// the "verack" message.
+			this.once('verack', (function () {
+				this.recvVer = message.version;
+			}).bind(this));
+		}
 		break;
+
+	case 'verack':
+		this.recvVer = Math.min(message.version, this.us.version);
 	}
 
 	this.emit(message.command, {
@@ -76,12 +103,26 @@ Connection.prototype.handleData = function (data) {
 	});
 };
 
+Connection.prototype.sendVersion = function () {
+	var put = Binary.put();
+	put.word32le(this.us.version); // version
+	put.word64le(1); // services
+	put.word64le(Math.round(new Date().getTime()/1000)); // timestamp
+	put.pad(26); // addr_me
+	put.pad(26); // addr_you
+	put.put(this.us.nonce);
+	put.word8(0);
+	put.word32le(10);
+
+	this.sendMessage('version', put.buffer());
+};
+
 Connection.prototype.sendGetBlocks = function (starts, stop) {
 	var put = Binary.put();
-	put.word32le(this.version);
+	put.word32le(this.sendVer);
 
 	put.var_uint(starts.length);
-	for (var i in starts) {
+	for (var i = 0; i < starts.length; i++) {
 		var startBuffer = new Buffer(starts[i], 'binary');
 		if (startBuffer.length != 32) throw 'Invalid hash length';
 		put.put(startBuffer);
@@ -95,52 +136,100 @@ Connection.prototype.sendGetBlocks = function (starts, stop) {
 	this.sendMessage('getblocks', put.buffer());
 };
 
-Connection.prototype.sendMessage = function (command, payload) {
-	if (command.length > 12) throw 'Command name too long';
+Connection.prototype.sendGetData = function (invs) {
+	var put = Binary.put();
 
-	var checksum;
-	if (command == 'version' || command == 'verack') {
-		checksum = null;
-	} else {
-		checksum = (new Buffer(sha256(sha256(payload)), 'binary')).slice(0, 4);
+	put.var_uint(invs.length);
+	for (var i = 0; i < invs.length; i++) {
+		put.word32le(invs[i].type);
+		put.put(invs[i].hash);
 	}
 
-	var message = Binary.put();
-	message.put(new Buffer(magic, 'binary'));
-	message.put(new Buffer(command, 'ascii'));
-	message.pad(12 - command.length);
-
-	message.word32le(payload.length);
-
-	if (checksum) {
-		message.put(checksum);
-	}
-
-	message.put(payload);
-
-	console.log("Sending message "+command);
-
-	console.log(message.buffer());
-
-	this.socket.write(message.buffer());
+	this.sendMessage('getdata', put.buffer());
 };
 
-Connection.prototype.parseMessage = function (data) {
-	if (data.slice(0,4).toString('binary') != magic)
-		throw "Message did not start with magic sequence"
+Connection.prototype.sendGetAddr = function (invs) {
+	var put = Binary.put();
 
-	var parser = Binary.parse(data);
-	parser.skip(4); // magic
+	this.sendMessage('getaddr', put.buffer());
+};
+
+Connection.prototype.sendMessage = function (command, payload) {
+	var commandBuf = new Buffer(command, 'ascii');
+	if (commandBuf.length > 12) throw 'Command name too long';
+
+	var checksum;
+	if (this.sendVer >= 209) {
+		checksum = (sha256(sha256(payload))).slice(0, 4);
+	} else {
+		checksum = new Buffer([]);
+	}
+
+	var message = Binary.put();           // -- HEADER --
+	message.put(magic);                   // magic bytes
+	message.put(commandBuf);              // command name
+	message.pad(12 - commandBuf.length);  // zero-padded
+	message.word32le(payload.length);     // payload length
+	message.put(checksum);                // checksum
+	                                      // -- BODY --
+	message.put(payload);                 // payload data
+
+	var buffer = message.buffer();
+
+	winston.debug("Sending message "+command+" ("+(payload.length + checksum.length)+"/"+buffer.length+")");
+
+	this.socket.write(buffer);
+};
+
+Connection.prototype.setupParser = function (parser, callback) {
+	var self = this;
+	parser.scan('garbage', magic); // magic
 	parser.buffer('command', 12);
 	parser.word32le('payload_len');
-	parser.buffer('payload', 'payload_len');
 
-	// Convert command name to string and remove trailing \0
-	var command = parser.vars.command.toString('ascii').replace(/\0+$/,"");
+	parser.tap((function (vars) {
+		if (vars.garbage.length) {
+			winston.debug('Received '+vars.garbage.length+' bytes of inter-message garbage: ');
+			winston.debug(vars.garbage);
+		}
 
-	console.log("Received message "+command);
+		// Convert command name to string and remove trailing \0
+		var command = vars.command.toString('ascii').replace(/\0+$/,"");
 
-	parser = Binary.parse(parser.vars.payload);
+		winston.debug("Received message "+command+" ("+vars['payload_len']+" bytes)");
+
+		if (this.recvVer >= 209) {
+			parser.buffer('checksum', 4);
+		}
+
+		parser.buffer('payload', vars['payload_len']);
+
+		parser.tap((function (vars) {
+			if (vars.payload.length != vars['payload_len']) {
+				winston.error('Connection.setupParser(): Payload has incorrect length');
+			}
+			if ("undefined" !== typeof vars.checksum) {
+				var checksum = (new Buffer(sha256(sha256(vars.payload)), 'binary'));
+				if (vars.checksum[0] != checksum[0] ||
+					vars.checksum[1] != checksum[1] ||
+					vars.checksum[2] != checksum[2] ||
+					vars.checksum[3] != checksum[3]) {
+					winston.error('Connection.setupParser(): Checksum failed',
+								  {cmd: command,
+								   expected: checksum.parent.hexSlice(0,4),
+								   actual: vars.checksum.parent.hexSlice(0,4)});
+					throw 'Unable to validate checksum';
+				}
+			}
+
+			self.parseMessage(command, vars.payload, callback);
+			self.setupParser(parser, callback);
+		}).bind(this));
+	}).bind(this));
+};
+
+Connection.prototype.parseMessage = function (command, payload, callback) {
+	var parser = Binary.parse(payload);
 	switch (command) {
 	case 'version': // https://en.bitcoin.it/wiki/Protocol_specification#version
 		parser.word32le('version');
@@ -151,14 +240,74 @@ Connection.prototype.parseMessage = function (data) {
 		parser.scan('sub_version_num', '\0');
 		parser.word32le('start_height');
 		break;
+
+	case 'inv':
+		this.parseVarInt(parser, 'count');
+
+		var invs = [];
+		for (var i = 0; i < parser.vars.count; i++) {
+			parser.word32le('type');
+			parser.buffer('hash', 32);
+			invs.push({type: parser.vars.type, hash: parser.vars.hash});
+			delete parser.vars.type;
+			delete parser.vars.hash;
+		}
+
+		parser.vars.invs = invs;
+		break;
+
+	case 'block':
+		// TODO: Parse
+		break;
+
+	case 'addr':
+		// TODO: Parse
+		break;
+
+	case 'getaddr':
+		// Empty message, nothing to parse
+		break;
+
+	case 'verack':
+		// Empty message, nothing to parse
+		break;
+
 	default:
-		winston.error('Connection.parseMessage(): Command not implemented', {cmd: command});
-		throw 'Command not implemented';
+		winston.error('Connection.parseMessage(): Command not implemented',
+					  {cmd: command});
+		return;
 	}
 
 	var message = parser.vars;
 
 	message.command = command;
 
-	return message;
+	callback(message);
+};
+
+Connection.prototype.parseVarInt = function (parser, name) {
+	// TODO: This function currently only supports reading from buffers, not streams
+
+	parser.word8(name+'_byte');
+
+	console.log('first byte: '+parser.vars[name+'_byte']);
+
+	switch (parser.vars[name+'_byte']) {
+	case 0xFD:
+		parser.word16le(name);
+		break;
+
+	case 0xFE:
+		parser.word32le(name);
+		break;
+
+	case 0xFF:
+		parser.word64le(name);
+		break;
+
+	default:
+		parser.vars[name] = parser.vars[name+'_byte'];
+	}
+
+	delete parser.vars[name+'_byte'];
 };

@@ -60,4 +60,17 @@ var Storage = exports.Storage = function (uri) {
 			callback(null, [genesis_block.hash], []); // success
 		});
 	};
+
+	this.knowsBlock = function (hash, callback) {
+		if (hash instanceof Buffer) {
+			hash = hash.toString('binary');
+		} else if (typeof hash !== "string") {
+			callback('Invalid value for hash');
+			return;
+		}
+
+		Block.find({'hash': hash.toString('binary')}).count(function (err, count) {
+			callback(err, !!count);
+		});
+	};
 };
