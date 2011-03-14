@@ -1,3 +1,4 @@
+require('buffertools');
 var Storage = require('./bitcoin/storage').Storage;
 var Node = require('./bitcoin/node').Node;
 

@@ -2,6 +2,7 @@ var winston = require('winston'); // logging
 
 var Peer = require('./peer').Peer;
 var Connection = require('./connection').Connection;
+var BlockChain = require('./blockchain').BlockChain;
 
 var Node = function (storage) {
 	this.peers = [];
@@ -9,6 +10,8 @@ var Node = function (storage) {
 	this.storage = storage;
 	this.nonce = new Buffer('a8deb8a83928aff8', 'hex');
 	this.version = 32001;
+
+	this.blockChain = new BlockChain(storage);
 };
 
 Node.prototype.start = function () {
@@ -36,10 +39,35 @@ Node.prototype.addConnection = function (conn) {
 };
 
 Node.prototype.handleConnect = function (e) {
-	this.storage.getEnds(function (err, heads, tails) {
-		e.conn.sendGetBlocks(heads, '\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0');
-		//e.conn.sendGetAddr();
-	});
+	this.startBlockChainDownload();
+};
+
+Node.prototype.startBlockChainDownload = function () {
+	// TODO: Figure out a way to spread load across peers
+	this.blockChain.getGenesisBlock((function (err, genesisBlock) {
+		if (err) {
+			winston.error(err);
+			return;
+		}
+
+		this.blockChain.getTopBlock((function (err, topBlock) {
+			if (err) {
+				winston.error(err);
+				return;
+			}
+
+			var starts = [];
+
+			if (topBlock.hash.compare(genesisBlock.hash) !== 0) {
+				console.log('using top block');
+				starts.push(topBlock.hash);
+			}
+
+			starts.push(genesisBlock.hash);
+
+			this.connections[0].sendGetBlocks(starts, genesisBlock.hash);
+		}).bind(this));
+	}).bind(this));
 };
 
 Node.prototype.handleInv = function (e) {
@@ -77,6 +105,22 @@ Node.prototype.handleInv = function (e) {
 };
 
 Node.prototype.handleBlock = function (e) {
+	var block = {
+		"version": 1,
+		"prev_hash": e.message['prev_hash'],
+		"merkle_root": e.message['merkle_root'],
+		"timestamp": e.message.timestamp,
+		"bits": e.message.bits,
+		"nonce": e.message.nonce
+	};
+	block.hash = this.blockChain.calcHash(block);
+	this.blockChain.add(block, function (err, block) {
+		if (err) {
+			winston.error("Error while adding block to chain: "+err);
+			return;
+		}
+		winston.info('block created successfully', block);
+	});
 	winston.info('TODO handle block');
 };
 

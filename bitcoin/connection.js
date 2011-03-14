@@ -1,14 +1,10 @@
 var sys = require('sys');
 var events = require('events');
-var crypto = require('crypto');
 var winston = require('winston'); // logging
 var Binary = require('binary');
+var Util = require('./util');
 
 var magic = new Buffer('F9BEB4D9', 'hex');
-
-function sha256(data) {
-	return new Buffer(crypto.createHash('sha256').update(data).digest('binary'), 'binary');
-};
 
 Binary.put.prototype.var_uint = function (i) {
 	if (i < 0xFD) {
@@ -160,7 +156,7 @@ Connection.prototype.sendMessage = function (command, payload) {
 
 	var checksum;
 	if (this.sendVer >= 209) {
-		checksum = (sha256(sha256(payload))).slice(0, 4);
+		checksum = Util.twoSha256(payload).slice(0, 4);
 	} else {
 		checksum = new Buffer([]);
 	}
@@ -209,7 +205,7 @@ Connection.prototype.setupParser = function (parser, callback) {
 				winston.error('Connection.setupParser(): Payload has incorrect length');
 			}
 			if ("undefined" !== typeof vars.checksum) {
-				var checksum = (new Buffer(sha256(sha256(vars.payload)), 'binary'));
+				var checksum = (new Buffer(Util.twoSha256(vars.payload), 'binary'));
 				if (vars.checksum[0] != checksum[0] ||
 					vars.checksum[1] != checksum[1] ||
 					vars.checksum[2] != checksum[2] ||
@@ -230,6 +226,9 @@ Connection.prototype.setupParser = function (parser, callback) {
 
 Connection.prototype.parseMessage = function (command, payload, callback) {
 	var parser = Binary.parse(payload);
+
+	parser.vars.command = command;
+
 	switch (command) {
 	case 'version': // https://en.bitcoin.it/wiki/Protocol_specification#version
 		parser.word32le('version');
@@ -257,7 +256,15 @@ Connection.prototype.parseMessage = function (command, payload, callback) {
 		break;
 
 	case 'block':
-		// TODO: Parse
+		parser.word32le('version');
+		parser.buffer('prev_hash', 32);
+		parser.buffer('merkle_root', 32);
+		parser.word32le('timestamp');
+		parser.word32le('bits');
+		parser.word32le('nonce');
+		this.parseVarInt(parser, 'txn_count');
+
+		// TODO: Parse tx
 		break;
 
 	case 'addr':
@@ -272,6 +279,10 @@ Connection.prototype.parseMessage = function (command, payload, callback) {
 		// Empty message, nothing to parse
 		break;
 
+	case 'ping':
+		// Empty message, nothing to parse
+		break;
+
 	default:
 		winston.error('Connection.parseMessage(): Command not implemented',
 					  {cmd: command});
@@ -280,8 +291,6 @@ Connection.prototype.parseMessage = function (command, payload, callback) {
 
 	var message = parser.vars;
 
-	message.command = command;
-
 	callback(message);
 };
 
@@ -289,8 +298,6 @@ Connection.prototype.parseVarInt = function (parser, name) {
 	// TODO: This function currently only supports reading from buffers, not streams
 
 	parser.word8(name+'_byte');
-
-	console.log('first byte: '+parser.vars[name+'_byte']);
 
 	switch (parser.vars[name+'_byte']) {
 	case 0xFD:
