@@ -1,4 +1,4 @@
-var mongoose = require('../vendor/mongoose/lib/mongoose/index'); // database
+var mongoose = require('../../vendor/mongoose/lib/mongoose/index'); // database
 
 var Schema = mongoose.Schema,
     ObjectId = Schema.ObjectId;
@@ -27,17 +27,4 @@ var Transaction = new Schema({
 	outs: [TransactionOut]
 });
 
-var Block = new Schema({
-	hash: { type: Buffer, unique: true, default: function () {
-		console.log('bla', this);
-	} },
-	prev_hash: { type: Buffer, index: true },
-	merkle_root: Buffer,
-	timestamp: Number,
-	bits: Number,
-	nonce: Number,
-	version: String,
-	height: { type: Number, index: true }
-});
-
-mongoose.model('Block', Block);
+mongoose.model('Transaction', Transaction);

@@ -41,20 +41,50 @@ var genesis_block_tx = {
 var BlockChain = exports.BlockChain = function (storage) {
 	this.storage = storage;
 
+	var self = this;
+
 	var Block = this.storage.Block;
+	var Transaction = this.storage.Transaction;
+
+	var orphanBlockFutures = {};
 
 	function createGenesisBlock(callback) {
 		winston.info("Loading genesis block");
 
-		Block.create(genesis_block, callback);
+		var genesisBlock = new Block(genesis_block);
+
+		// A sensible sanity check to make sure our constants are not
+		// corrupted and our block hashing algorithm is working.
+		if (!genesisBlock.checkHash()) {
+			throw "Genesis block constants validation failed. There is something wrong with our constants or hash validation code.";
+		}
+
+		genesisBlock.save(function (err) {
+			self.executeOrphanBlockFutures(genesisBlock);
+			callback(err, genesisBlock);
+		});
+	};
+
+	this.getBlockByHash = function getBlockByHash(hash, callback) {
+		Block.findOne({hash: hash}, function (err, block) {
+			if (err) {
+				callback(err);
+				return;
+			}
+
+			callback(err, block);
+		});
 	};
 
 	this.getGenesisBlock = function getGenesisBlock(callback) {
-		Block.findOne({hash: genesis_block.hash}, function (err, docs) {
-			if (err) return callback(err);
+		this.getBlockByHash(genesis_block.hash, function (err, block) {
+			if (err) {
+				callback(err);
+				return;
+			}
 
-			if (!docs) createGenesisBlock(callback);
-			//else callback(err, docs); // no action necessary
+			if (!block) createGenesisBlock(callback);
+			else callback(err, block); // no action necessary
 		});
 	};
 
@@ -70,28 +100,56 @@ var BlockChain = exports.BlockChain = function (storage) {
 		});
 	};
 
-	this.getHeader = function (block) {
-		put = Binary.put();
-		put.word32le(block.version);
-		put.put(block.prev_hash);
-		put.put(block.merkle_root);
-		put.word32le(block.timestamp);
-		put.word32le(block.bits);
-		put.word32le(block.nonce);
-		return put.buffer();
-	};
-
-	this.calcHash = function (block) {
-		var header = this.getHeader(block);
-
-		return Util.twoSha256(header);
-	};
-
 	this.add = function add(block, callback) {
-		Block.create(block, function (err, block) {
-			if (err) return callback(err);
+		var self = this;
 
-			
+		if (!block instanceof Block) {
+			block = this.makeBlockObject(block);
+		}
+
+		function connectBlockToParentAndSave(parent) {
+			// Our parent block is there, let's attach ourselves
+			block.height = parent.height + 1;
+
+			block.save(function (err) {
+				if (err) return callback(err);
+
+				// Since we were able to connect into the chain, we should go
+				// and find out if there are any lost children waiting for us.
+				self.executeOrphanBlockFutures(block);
+
+				callback(err, block);
+			});
+		};
+
+		this.getBlockByHash(block.prev_hash, function (err, prevBlock) {
+			// Let's see if we are able to connect into the chain
+			if (!err && prevBlock && prevBlock.height >= 1) {
+				// Our parent is in the chain, connect up and save
+				connectBlockToParentAndSave(prevBlock);
+			} else {
+				// Our parent is not in the chain, create a future to be
+				// executed when it is.
+				var future = connectBlockToParentAndSave;
+				if (orphanBlockFutures[block.prev_hash]) {
+					orphanBlockFutures[block.prev_hash].push(future);
+				} else {
+					orphanBlockFutures[block.prev_hash] = [future];
+				}
+			}
 		});
+	};
+
+	this.makeBlockObject = function (blockData) {
+		return new Block(blockData);
+	};
+
+	this.executeOrphanBlockFutures = function (block) {
+		var futures = orphanBlockFutures[block.hash];
+		if (futures) {
+			for (var i = 0; i < futures.length; i++) {
+				futures[i](block);
+			}
+		}
 	};
 };

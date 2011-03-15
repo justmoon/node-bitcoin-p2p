@@ -1,11 +1,12 @@
 var winston = require('winston'); // logging
 var mongoose = require('../vendor/mongoose/lib/mongoose/index'); // database
-require('./schema');
+require('./schema/index');
 
 var Storage = exports.Storage = function (uri) {
 	this.connection = mongoose.createConnection(uri);
 
 	var Block = this.Block = this.connection.model('Block');
+	var Transaction = this.Transaction = this.connection.model('Transaction');
 
 	function difficulty(bits) {
 
