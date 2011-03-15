@@ -6,17 +6,21 @@ var genesis_block = {
 	'height': 1.0,
 	'nonce': 2083236893,
 	'version': 1,
-	'hash': new Buffer('o\xe2\x8c\n\xb6\xf1\xb3r\xc1\xa6\xa2F\xaec\xf7O\x93\x1e\x83e\xe1Z\x08\x9ch\xd6\x19\x00\x00\x00\x00\x00', 'binary'),
-	'prev_hash': new Buffer('\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00', 'binary'),
+	'hash': new Buffer('6FE28C0AB6F1B372C1A6A246AE63F74F931E8365E15A089C68D6190000000000', 'hex'),
+	'prev_hash': new Buffer(32).clear(),
 	'timestamp': 1231006505,
-	'merkle_root': new Buffer(';\xa3\xed\xfdz{\x12\xb2z\xc7,>gv\x8fa\x7f\xc8\x1b\xc3\x88\x8aQ2:\x9f\xb8\xaaK\x1e^J', 'binary'),
+	'merkle_root': new Buffer('3BA3EDFD7A7B12B27AC72C3E67768F617FC81BC3888A51323A9FB8AA4B1E5E4A', 'hex'),
 	'bits': 486604799
 };
 
 var genesis_block_tx = {
 	'outs': [{
-		'script': new Buffer("A\x04g\x8a\xfd\xb0\xfeUH'\x19g\xf1\xa6q0\xb7\x10\\\xd6\xa8(\xe09\t\xa6yb\xe0\xea\x1fa\xde\xb6I\xf6\xbc?L\xef8\xc4\xf3U\x04\xe5\x1e\xc1\x12\xde\\8M\xf7\xba\x0b\x8dW\x8aLp+k\xf1\x1d_\xac", 'binary'),
-		'value': 5000000000
+		'value': 5000000000,
+		'script': Binary.put()
+			.word8(65) // ???
+			.put(new Buffer('04678AFDB0FE5548271967F1A67130B7105CD6A828E03909A67962E0EA1F61DEB649F6BC3F4CEF38C4F35504E51EC112DE5C384DF7BA0B8D578A4C702B6BF11D5F', 'hex'))
+			.word8(0xAC)
+			.buffer() // OP_CHECKSIG
 	}],
 	'lock_time': 0,
 	'version': 1,
@@ -25,9 +29,12 @@ var genesis_block_tx = {
 		'sequence': 4294967295,
 		'outpoint': {
 			'index': 4294967295,
-			'hash': new Buffer('\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00', 'binary')
+			'hash': new Buffer(32).clear()
 		},
-		'script': new Buffer('\x04\xff\xff\x00\x1d\x01\x04EThe Times 03/Jan/2009 Chancellor on brink of second bailout for banks', 'binary')
+		'script': Binary.put()
+			.put(new Buffer('04FFFF001D010445', 'hex'))
+			.put(new Buffer('The Times 03/Jan/2009 Chancellor on brink of second bailout for banks', 'ascii'))
+			.buffer()
 	}]
 };
 

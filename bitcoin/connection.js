@@ -4,7 +4,7 @@ var winston = require('winston'); // logging
 var Binary = require('binary');
 var Util = require('./util');
 
-var magic = new Buffer('F9BEB4D9', 'hex');
+var magic = new Buffer('f9beb4d9', 'hex');
 
 Binary.put.prototype.var_uint = function (i) {
 	if (i < 0xFD) {
