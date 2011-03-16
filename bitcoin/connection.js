@@ -53,7 +53,11 @@ Connection.prototype.setupHandlers = function () {
 	this.socket.addListener('connect', this.handleConnect.bind(this));
 	this.socket.addListener('data', function (data) {
 		var dumpLen = 35;
-		winston.debug('Recieved '+data.length+' bytes of data '+data.slice(0, dumpLen > data.length ? data.length : dumpLen).toString('hex') + (data.length > dumpLen ? '...' : ''));
+		winston.debug('Recieved '+data.length+' bytes of data ' +
+					  data.slice(0, dumpLen > data.length ?
+								 data.length :
+								 dumpLen).toString('hex') +
+					  (data.length > dumpLen ? '...' : ''));
 	});
 
 	var parser = Binary.stream(this.socket);

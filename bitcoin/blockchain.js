@@ -1,3 +1,4 @@
+var sys = require('sys');
 var winston = require('winston'); // logging
 var Binary = require('binary');
 var Util = require('./util');
@@ -39,6 +40,8 @@ var genesis_block_tx = {
 };
 
 var BlockChain = exports.BlockChain = function (storage) {
+	events.EventEmitter.call(this);
+
 	this.storage = storage;
 
 	var self = this;
@@ -46,22 +49,38 @@ var BlockChain = exports.BlockChain = function (storage) {
 	var Block = this.storage.Block;
 	var Transaction = this.storage.Transaction;
 
+	var genesisBlock = null;
+	var currentTopBlock = null;
 	var orphanBlockFutures = {};
 
 	function createGenesisBlock(callback) {
 		winston.info("Loading genesis block");
 
-		var genesisBlock = new Block(genesis_block);
+		genesisBlock = currentTopBlock = new Block(genesis_block);
 
 		// A sensible sanity check to make sure our constants are not
 		// corrupted and our block hashing algorithm is working.
 		if (!genesisBlock.checkHash()) {
-			throw "Genesis block constants validation failed. There is something wrong with our constants or hash validation code.";
+			winston.error("Genesis block constants validation failed. There is something wrong with our constants or hash validation code.");
+			return;
 		}
 
+		self.emit('blockAdd', {block: genesisBlock});
+
 		genesisBlock.save(function (err) {
-			self.executeOrphanBlockFutures(genesisBlock);
-			callback(err, genesisBlock);
+			self.emit('blockSave', {block: genesisBlock});
+			callback();
+		});
+	};
+
+	function loadTopBlock(callback) {
+		Block.find().sort('height', -1).limit(1).exec(function (err, block) {
+			if (err) {
+				winston.error("Error while initializing block chain", err);
+				return;
+			}
+			currentTopBlock = block[0];
+			callback();
 		});
 	};
 
@@ -76,28 +95,12 @@ var BlockChain = exports.BlockChain = function (storage) {
 		});
 	};
 
-	this.getGenesisBlock = function getGenesisBlock(callback) {
-		this.getBlockByHash(genesis_block.hash, function (err, block) {
-			if (err) {
-				callback(err);
-				return;
-			}
-
-			if (!block) createGenesisBlock(callback);
-			else callback(err, block); // no action necessary
-		});
+	this.getGenesisBlock = function getGenesisBlock() {
+		return genesisBlock;
 	};
 
 	this.getTopBlock = function getTopBlock(callback) {
-		Block
-			.find()
-			.sort('height', -1)
-			.limit(1)
-			.exec(function (err, result) {
-				if (err) return callback(err);
-
-				callback(null, result[0]);
-		});
+		return currentTopBlock;
 	};
 
 	this.add = function add(block, callback) {
@@ -111,12 +114,22 @@ var BlockChain = exports.BlockChain = function (storage) {
 			// Our parent block is there, let's attach ourselves
 			block.height = parent.height + 1;
 
-			block.save(function (err) {
-				if (err) return callback(err);
+			// Update top block field if this is the new best block availabe.
+			if (block.height > currentTopBlock.height) {
+				currentTopBlock = block;
+			}
 
-				// Since we were able to connect into the chain, we should go
-				// and find out if there are any lost children waiting for us.
-				self.executeOrphanBlockFutures(block);
+			self.emit('blockAdd', {block: block, chain: self});
+
+			block.save(function (err) {
+				if (err) {
+					// TODO: Handle if block is a duplicate
+					return callback(err);
+				}
+
+				// This event will also trigger us saving all child blocks that
+				// are currently waiting.
+				self.emit('blockSave', {block: block, chain: self});
 
 				callback(err, block);
 			});
@@ -128,6 +141,7 @@ var BlockChain = exports.BlockChain = function (storage) {
 				// Our parent is in the chain, connect up and save
 				connectBlockToParentAndSave(prevBlock);
 			} else {
+				console.log('Block waiting for connection: '+block);
 				// Our parent is not in the chain, create a future to be
 				// executed when it is.
 				var future = connectBlockToParentAndSave;
@@ -151,5 +165,20 @@ var BlockChain = exports.BlockChain = function (storage) {
 				futures[i](block);
 			}
 		}
+		delete orphanBlockFutures[block.hash];
 	};
+
+	this.init = function (callback) {
+		createGenesisBlock(function () {
+			loadTopBlock(function () {
+				callback();
+			});
+		});
+	}
+
+	this.on('blockSave', function (e) {
+		self.executeOrphanBlockFutures(e.block);
+	});
 };
+
+sys.inherits(BlockChain, events.EventEmitter);

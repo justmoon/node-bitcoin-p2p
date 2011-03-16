@@ -40,8 +40,7 @@ Block.method('checkHash', function () {
 });
 
 Block.method('toString', function () {
-	var hex = this.hash.reverse().slice(0,10).toHex();
-	return "<Block " + hex + " height="+this.height+">";
+	return "<Block " + Util.formatHash(this.hash) + " height="+this.height+">";
 });
 
 mongoose.model('Block', Block);
