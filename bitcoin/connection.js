@@ -172,38 +172,42 @@ Connection.prototype.sendMessage = function (command, payload) {
 
 	var buffer = message.buffer();
 
-	winston.debug("Sending message "+command+" ("+(payload.length + checksum.length)+"/"+buffer.length+")");
+	winston.debug("Sending message "+command+" ("+payload.length+" bytes)");
 
 	this.socket.write(buffer);
 };
 
 Connection.prototype.setupParser = function (parser, callback) {
 	var self = this;
-	parser.scan('garbage', magic); // magic
-	parser.buffer('command', 12);
-	parser.word32le('payload_len');
 
-	parser.tap((function (vars) {
-		if (vars.garbage.length) {
-			winston.debug('Received '+vars.garbage.length+' bytes of inter-message garbage: ');
-			winston.debug(vars.garbage);
+	parser.loop(function (end) {
+		var vars = this.vars;
+
+		this.scan('garbage', magic); // magic
+		this.buffer('command', 12);
+		this.word32le('payload_len');
+
+		if (self.recvVer >= 209) {
+			this.buffer('checksum', 4);
 		}
 
-		// Convert command name to string and remove trailing \0
-		var command = vars.command.toString('ascii').replace(/\0+$/,"");
+		this.buffer('payload', 'payload_len');
 
-		winston.debug("Received message "+command+" ("+vars['payload_len']+" bytes)");
+		this.tap(function (vars) {
+			if (vars.garbage.length) {
+				winston.debug('Received '+vars.garbage.length+' bytes of inter-message garbage: ');
+				winston.debug(vars.garbage);
+			}
 
-		if (this.recvVer >= 209) {
-			parser.buffer('checksum', 4);
-		}
+			// Convert command name to string and remove trailing \0
+			var command = vars.command.toString('ascii').replace(/\0+$/,"");
 
-		parser.buffer('payload', vars['payload_len']);
+			winston.debug("Received message "+command+" ("+vars['payload_len']+" bytes)");
 
-		parser.tap((function (vars) {
 			if (vars.payload.length != vars['payload_len']) {
 				winston.error('Connection.setupParser(): Payload has incorrect length');
 			}
+
 			if ("undefined" !== typeof vars.checksum) {
 				var checksum = (new Buffer(Util.twoSha256(vars.payload), 'binary'));
 				if (vars.checksum[0] != checksum[0] ||
@@ -219,9 +223,8 @@ Connection.prototype.setupParser = function (parser, callback) {
 			}
 
 			self.parseMessage(command, vars.payload, callback);
-			self.setupParser(parser, callback);
-		}).bind(this));
-	}).bind(this));
+		});
+	});
 };
 
 Connection.prototype.parseMessage = function (command, payload, callback) {
