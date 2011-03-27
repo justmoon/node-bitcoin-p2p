@@ -8,7 +8,22 @@
 		"bitcoin",
 		"client"
 	],
+
+	"scripts": {
+      "install": "node-waf configure build"
+    },
+    
+    "dependencies": {
+      "binary": ">=0.1.9"
+    },
+	
 	"author": "Stefan Thomas <justmoon@members.fsf.org> (http://www.justmoon.net)",
+	
+	"contributors": [
+		"Andrew Schaaf <andrew@andrewschaaf.com>",
+		"Mike Hearn <hearn@google.com>"
+	]
+
 	"repository" : {
 		"type" : "git",
 		"url" : "https://justmoon@github.com/justmoon/node-bitcoin-p2p.git"
