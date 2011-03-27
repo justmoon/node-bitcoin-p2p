@@ -1,0 +1,16 @@
+{
+	"name": "bitcoin-p2p",
+	"version": "0.0.1",
+	"description": "Implementation of Bitcoin's peer-to-peer layer for Node.js",
+	"main": "./lib/bitcoin",
+	"keywords": [
+		"peer-to-peer",
+		"bitcoin",
+		"client"
+	],
+	"author": "Stefan Thomas <justmoon@members.fsf.org> (http://www.justmoon.net)",
+	"repository" : {
+		"type" : "git",
+		"url" : "https://justmoon@github.com/justmoon/node-bitcoin-p2p.git"
+	}
+}
