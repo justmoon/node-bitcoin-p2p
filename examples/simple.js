@@ -1,4 +1,3 @@
-require('buffertools');
 var Bitcoin = require('../lib/bitcoin');
 var Storage = Bitcoin.Storage;
 var Node = Bitcoin.Node;
