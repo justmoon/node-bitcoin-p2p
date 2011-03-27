@@ -1,29 +1,10 @@
 var sys = require('sys');
 var events = require('events');
 var winston = require('winston'); // logging
-var Binary = require('binary');
+var Binary = require('./binary');
 var Util = require('./util');
 
 var magic = new Buffer('f9beb4d9', 'hex');
-
-Binary.put.prototype.var_uint = function (i) {
-	if (i < 0xFD) {
-		// unsigned char
-		this.word8(i);
-	} else if (i <= 1<<16) {
-		this.word8(0xFD);
-		// unsigned short (LE)
-		this.word16le(i);
-	} else if (i <= 1<<32) {
-		this.word8(0xFE);
-		// unsigned int (LE)
-		this.word32le(i);
-    } else {
-		this.word8(0xFF);
-		// unsigned long long (LE)
-		this.word64le(i);
-    }
-};
 
 var Connection = exports.Connection = function (us, socket, peer) {
 	events.EventEmitter.call(this);
@@ -226,7 +207,8 @@ Connection.prototype.setupParser = function (parser, callback) {
 				}
 			}
 
-			self.parseMessage(command, vars.payload, callback);
+			var message = self.parseMessage(command, vars.payload);
+			callback(message);
 		});
 	});
 };
@@ -254,12 +236,17 @@ Connection.prototype.parseMessage = function (command, payload, callback) {
 		for (var i = 0; i < parser.vars.count; i++) {
 			parser.word32le('type');
 			parser.buffer('hash', 32);
-			invs.push({type: parser.vars.type, hash: parser.vars.hash});
-			delete parser.vars.type;
-			delete parser.vars.hash;
+			invs.push({
+				type: parser.vars.type,
+				hash: parser.vars.hash
+			});
 		}
 
-		parser.vars.invs = invs;
+		return {
+			command: command,
+			count: parser.vars.count,
+			invs: invs
+		};
 		break;
 
 	case 'block':
@@ -271,7 +258,62 @@ Connection.prototype.parseMessage = function (command, payload, callback) {
 		parser.word32le('nonce');
 		this.parseVarInt(parser, 'txn_count');
 
-		// TODO: Parse tx
+		var txs = [];
+		for (var i = 0; i < parser.vars.txn_count; i++) {
+			parser.word32le('tx_version');
+			this.parseVarInt(parser, 'tx_in_count');
+
+			var tx_ins = [];
+			for (var j = 0; j < parser.vars.tx_in_count; j++) {
+				parser.buffer('tx_in_out_hash', 32);
+				parser.word32le('tx_in_out_index');
+				this.parseVarInt(parser, 'tx_in_script_len');
+				parser.buffer('tx_in_script', 'tx_in_script_len');
+				parser.word32le('tx_in_seq');
+				tx_ins.push({
+					outpoint: {
+						hash: parser.vars.tx_in_out_hash,
+						index: parser.vars.tx_in_out_index
+					},
+					script: parser.vars.tx_in_script,
+					sequence: parser.vars.tx_in_seq
+				});
+			}
+
+			this.parseVarInt(parser, 'tx_out_count');
+
+			var tx_outs = [];
+			for (var j = 0; j < parser.vars.tx_out_count; j++) {
+				parser.buffer('tx_out_value', 8);
+				this.parseVarInt(parser, 'tx_out_pk_script_len');
+				parser.buffer('tx_out_pk_script', 'tx_out_pk_script_len');
+
+				tx_outs.push({
+					value: parser.vars.tx_out_value,
+					script: parser.vars.tx_out_pk_script
+				});
+			}
+
+			parser.word32le('tx_lock_time');
+
+			txs.push({
+				version: parser.vars.tx_version,
+				lock_time: parser.vars.tx_lock_time,
+				ins: tx_ins,
+				outs: tx_outs
+			});
+		}
+
+		return {
+			command: command,
+			version: parser.vars.version,
+			prev_hash: parser.vars.prev_hash,
+			merkle_root: parser.vars.merkle_root,
+			timestamp: parser.vars.timestamp,
+			bits: parser.vars.bits,
+			nonce: parser.vars.nonce,
+			txs: txs
+		};
 		break;
 
 	case 'addr':
@@ -296,9 +338,7 @@ Connection.prototype.parseMessage = function (command, payload, callback) {
 		return;
 	}
 
-	var message = parser.vars;
-
-	callback(message);
+	return parser.vars;
 };
 
 Connection.prototype.parseVarInt = function (parser, name) {

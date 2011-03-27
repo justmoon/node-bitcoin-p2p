@@ -7,6 +7,7 @@ var Storage = exports.Storage = function (uri) {
 
 	var Block = this.Block = this.connection.model('Block');
 	var Transaction = this.Transaction = this.connection.model('Transaction');
+	var Account = this.Account = this.connection.model('Account');
 
 	function difficulty(bits) {
 

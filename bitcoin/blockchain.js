@@ -16,7 +16,7 @@ var genesis_block = {
 
 var genesis_block_tx = {
 	'outs': [{
-		'value': 5000000000,
+		'value': new Buffer('00F2052A01000000', 'hex'), // 50 BTC
 		'script': Binary.put()
 			.word8(65) // ???
 			.put(new Buffer('04678AFDB0FE5548271967F1A67130B7105CD6A828E03909A67962E0EA1F61DEB649F6BC3F4CEF38C4F35504E51EC112DE5C384DF7BA0B8D578A4C702B6BF11D5F', 'hex'))
@@ -25,11 +25,11 @@ var genesis_block_tx = {
 	}],
 	'lock_time': 0,
 	'version': 1,
-	'hash': null,
+	'hash': new Buffer('3BA3EDFD7A7B12B27AC72C3E67768F617FC81BC3888A51323A9FB8AA4B1E5E4A', 'hex'),
 	'ins': [{
-		'sequence': 4294967295,
+		'sequence': 0xFFFFFFFF,
 		'outpoint': {
-			'index': 4294967295,
+			'index': 0xFFFFFFFF,
 			'hash': new Buffer(32).clear()
 		},
 		'script': Binary.put()
@@ -48,6 +48,7 @@ var BlockChain = exports.BlockChain = function (storage) {
 
 	var Block = this.storage.Block;
 	var Transaction = this.storage.Transaction;
+	var Account = this.storage.Account;
 
 	var genesisBlock = null;
 	var currentTopBlock = null;
@@ -61,7 +62,7 @@ var BlockChain = exports.BlockChain = function (storage) {
 		// A sensible sanity check to make sure our constants are not
 		// corrupted and our block hashing algorithm is working.
 		if (!genesisBlock.checkHash()) {
-			winston.error("Genesis block constants validation failed. There is something wrong with our constants or hash validation code.");
+			winston.error("Genesis block hash validation failed. There is something wrong with our constants or block hash validation code.");
 			return;
 		}
 
@@ -71,6 +72,13 @@ var BlockChain = exports.BlockChain = function (storage) {
 			self.emit('blockSave', {block: genesisBlock});
 			callback();
 		});
+
+		var genesisTransaction = new Transaction(genesis_block_tx);
+		if (!genesisTransaction.checkHash()) {
+			winston.error("Genesis tx hash validation failed. There is something wrong with our constants or tx hash validation code.");
+			return;
+		}
+		genesisTransaction.save();
 	};
 
 	function loadTopBlock(callback) {
@@ -103,7 +111,7 @@ var BlockChain = exports.BlockChain = function (storage) {
 		return currentTopBlock;
 	};
 
-	this.add = function add(block, callback) {
+	this.add = function add(block, txs, callback) {
 		var self = this;
 
 		if (!block instanceof Block) {
@@ -141,7 +149,6 @@ var BlockChain = exports.BlockChain = function (storage) {
 				// Our parent is in the chain, connect up and save
 				connectBlockToParentAndSave(prevBlock);
 			} else {
-				console.log('Block waiting for connection: '+block);
 				// Our parent is not in the chain, create a future to be
 				// executed when it is.
 				var future = connectBlockToParentAndSave;
@@ -151,6 +158,63 @@ var BlockChain = exports.BlockChain = function (storage) {
 					orphanBlockFutures[block.prev_hash] = [future];
 				}
 			}
+		});
+
+		txs.forEach(function (tx, i) {
+			var tx = new Transaction(txs[i]);
+
+			for (var i = 0; i < tx.outs.length; i++) {
+				var txout = tx.outs[i];
+				var script = txout.getScript();
+
+				var outPubKey = script.simpleOutPubKeyHash();
+
+				console.log("OUT "+Util.formatValue(txout.value)+" "+Util.formatBuffer(outPubKey));
+
+				Account.update(
+					// Find the account index for this public key
+					{ pubKeyHash: outPubKey },
+					// Atomic push this transaction as an out
+					{ $addToSet : { "txouts" : tx.getHash().toString('base64') } },
+					// Insert if not exists
+					{ upsert : true },
+					// Callback for error handling
+					function (err) {
+						if (err) {
+							winston.error("Error while registering txout for " +
+										  "pub key " + Util.formatBuffer(outPubKey) +
+										  ": " + err);
+						}
+					}
+				);
+			};
+
+			if (tx.isCoinBase()) return;
+
+			tx.ins.forEach(function (txin, j) {
+				var script = txin.getScript();
+
+				var inPubKey = Util.sha256ripe160(script.simpleInPubKey());
+
+				console.log("IN "+Util.formatBuffer(outPubKey));
+
+				Account.update(
+					// Find the account index for this public key
+					{ pubKeyHash: inPubKey },
+					// Atomic push this transaction as an out
+					{ $addToSet : { "txins" : tx.getHash().toString('base64') } },
+					// Insert if not exists
+					{ upsert : true },
+					// Callback for error handling
+					function (err) {
+						if (err) {
+							winston.error("Error while registering txout for " +
+										  "pub key " + Util.formatBuffer(outPubKey) +
+										  ": " + err);
+						}
+					}
+				);
+			});
 		});
 	};
 

@@ -2,7 +2,7 @@ require('buffertools');
 var Storage = require('./bitcoin/storage').Storage;
 var Node = require('./bitcoin/node').Node;
 
-var static_peers = ['192.168.0.18'];
+var static_peers = ['localhost'];
 
 var storage = new Storage('mongodb://localhost/bitcoin');
 

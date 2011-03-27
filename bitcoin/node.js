@@ -147,17 +147,18 @@ Node.prototype.handleInv = function (e) {
 };
 
 Node.prototype.handleBlock = function (e) {
+	var txs = e.message.txs;
 	var block = this.blockChain.makeBlockObject({
 		"version": 1,
-		"prev_hash": e.message['prev_hash'],
-		"merkle_root": e.message['merkle_root'],
+		"prev_hash": e.message.prev_hash,
+		"merkle_root": e.message.merkle_root,
 		"timestamp": e.message.timestamp,
 		"bits": e.message.bits,
 		"nonce": e.message.nonce
 	});
 
 	block.hash = block.calcHash();
-	this.blockChain.add(block, function (err, block) {
+	this.blockChain.add(block, txs, function (err, block) {
 		if (err) {
 			winston.error("Error while adding block to chain: "+err);
 			return;
