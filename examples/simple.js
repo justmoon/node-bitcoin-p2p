@@ -1,6 +1,7 @@
 require('buffertools');
-var Storage = require('./bitcoin/storage').Storage;
-var Node = require('./bitcoin/node').Node;
+var Bitcoin = require('../lib/bitcoin');
+var Storage = Bitcoin.Storage;
+var Node = Bitcoin.Node;
 
 var static_peers = ['localhost'];
 
