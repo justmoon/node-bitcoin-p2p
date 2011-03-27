@@ -214,6 +214,74 @@ base58_encode (const Arguments& args)
 }
 
 
+static Handle<Value>
+base58_decode (const Arguments& args)
+{
+  HandleScope scope;
+  
+  if (args.Length() != 1) {
+    return VException("One argument expected: a String");
+  }
+  if (!args[0]->IsString()) {
+    return VException("One argument expected: a String");
+  }
+  
+  BN_CTX *ctx = BN_CTX_new();
+  
+  BIGNUM *bn58 = BN_new();
+  BN_set_word(bn58, 58);
+  
+  BIGNUM *bn = BN_new();
+  BN_set_word(bn, 0);
+
+  BIGNUM *bnChar = BN_new();
+
+  String::Utf8Value str(args[0]->ToString());
+  char *psz = *str;
+  
+  while (isspace(*psz))
+    psz++;
+  
+  // Convert big endian string to bignum
+  for (const char* p = psz; *p; p++) {
+    const char* p1 = strchr(BASE58_ALPHABET, *p);
+    if (p1 == NULL) {
+      while (isspace(*p))
+        p++;
+      if (*p != '\0')
+        return VException("Error");
+      break;
+    }
+    BN_set_word(bnChar, p1 - BASE58_ALPHABET);
+    if (!BN_mul(bn, bn, bn58, ctx))
+      return VException("BN_mul failed");
+    if (!BN_add(bn, bn, bnChar))
+      return VException("BN_add failed");
+  }
+
+  // Get bignum as little endian data
+  unsigned int tmpLen = BN_num_bytes(bn);
+  unsigned char *tmp = (unsigned char *)malloc(tmpLen);
+  BN_bn2bin(bn, tmp);
+  
+  // Trim off sign byte if present
+  if (tmpLen >= 2 && tmp[tmpLen-1] == 0 && tmp[tmpLen-2] >= 0x80)
+    tmpLen--;
+  
+  // Restore leading zeros
+  int nLeadingZeros = 0;
+  for (const char* p = psz; *p == BASE58_ALPHABET[0]; p++)
+    nLeadingZeros++;
+
+  // Allocate buffer and zero it
+  Buffer *buf = Buffer::New(nLeadingZeros + tmpLen);
+  char* data = Buffer::Data(buf);
+  memset(data, 0, nLeadingZeros + tmpLen);
+  memcpy(data+nLeadingZeros, tmp, tmpLen);
+  return scope.Close(buf->handle_);
+}
+
+
 extern "C" void
 init (Handle<Object> target)
 {
@@ -221,4 +289,5 @@ init (Handle<Object> target)
   target->Set(String::New("new_keypair"), FunctionTemplate::New(new_keypair)->GetFunction());
   target->Set(String::New("pubkey_to_address256"), FunctionTemplate::New(pubkey_to_address256)->GetFunction());
   target->Set(String::New("base58_encode"), FunctionTemplate::New(base58_encode)->GetFunction());
+  target->Set(String::New("base58_decode"), FunctionTemplate::New(base58_decode)->GetFunction());
 }
