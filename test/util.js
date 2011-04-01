@@ -15,7 +15,6 @@ suite.addBatch({
 
 			'and check the result': function (topic) {
 				var addrHash = Util.addressToPubKeyHash(topic);
-				console.log(addrHash.toHex());
 				assert.equal(Util.pubKeyHashToAddress(addrHash), topic);
 			}
 		},
@@ -25,6 +24,18 @@ suite.addBatch({
 			'and check the result': function (topic) {
 				var addrHash = Util.pubKeyHashToAddress(topic);
 				assert.equal(Util.addressToPubKeyHash(addrHash).compare(topic), 0);
+			}
+		}
+	},
+
+	'difficulty': {
+		'calculate target from bits': {
+			topic: 0x1b0404cb,
+
+			'and check the result': function (topic) {
+				var target = Util.decodeCompactBits(topic);
+				assert.equal(target.toHex().replace(/^0*/, ''),
+							"404cb000000000000000000000000000000000000000000000000");
 			}
 		}
 	}
