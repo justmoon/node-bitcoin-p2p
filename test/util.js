@@ -33,9 +33,9 @@ suite.addBatch({
 			topic: 0x1b0404cb,
 
 			'and check the result': function (topic) {
-				var target = Util.decodeCompactBits(topic);
-				assert.equal(target.toHex().replace(/^0*/, ''),
-							"404cb000000000000000000000000000000000000000000000000");
+				var target = Util.decodeDiffBits(topic);
+				assert.equal(target.toHex(),
+							"00000000000404cb000000000000000000000000000000000000000000000000");
 			}
 		}
 	}
