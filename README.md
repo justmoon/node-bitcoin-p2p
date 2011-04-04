@@ -7,8 +7,8 @@ Node.js, using MongoDB as its back end.
 
 The official client contains the node, wallet, GUI and miner. This
 library only contains the node, i.e. the P2P part of Bitcoin. Its
-intended use is as a server component to allow lighter clients
-(real-time) access to the data in the block chain.
+intended use is as a server component to give lighter clients
+access to the data in the block chain (in real-time.)
 
 # Usage
 
@@ -46,34 +46,40 @@ chain changes:
 BlockChain emits the following events:
 
 **`blockAdd`** - Triggered right before a block is saved to storage
+
 - `block` The Block object for the block in question
 - `txs` The transactions attached to the block
 - `chain` The BlockChain object
 
 **`blockSave`** - Triggered right after a block is saved to storage
+
 - `block` The Block object for the block in question
 - `txs` The transactions attached to the block
 - `chain` The BlockChain object
 
 **`blockCommit`** - Triggered when a block is attached to the main
-  chain *(not yet implemented)*
+ chain *(not yet implemented)*
+
 - `block` The Block object for the block in question
 - `txs` The transactions attached to the block
 - `chain` The BlockChain object
 
 **`blockRevoke`** - Triggered as the main chain is rolled back due to
 a split *(not yet implemented)*
+
 - `block` The Block object for the block in question
 - `txs` The transactions attached to the block
 - `chain` The BlockChain object
 
 **`txAdd`** - Triggered right before a transaction is saved to storage
+
 - `block` Containing Block object
 - `index` The index of the transaction in question
 - `tx` The Transaction object
 - `chain` The BlockChain object
 
 **`txSave`** - Triggered right after a transaction is saved to storage
+
 - `block` Containing Block object
 - `index` The index of the transaction in question
 - `tx` The Transaction object
@@ -81,6 +87,7 @@ a split *(not yet implemented)*
 
 **`txCommit`** - Triggered when a transaction is confirmed for the
 first time *(not yet implemented)*
+
 - `block` Containing Block object
 - `index` The index of the transaction in question
 - `tx` The Transaction object
@@ -89,6 +96,7 @@ first time *(not yet implemented)*
 **`txRevoke`** - Triggered when a confirmed transaction is reverted as
 the containing block is no longer in the main chain *(not yet
 implemented)*
+
 - `block` Containing Block object
 - `index` The index of the transaction in question
 - `tx` The Transaction object
