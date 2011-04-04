@@ -10,12 +10,12 @@
 	],
 
 	"scripts": {
-      "install": "node-waf configure build"
-    },
-    
-    "dependencies": {
-      "binary": ">=0.1.9"
-    },
+	  "install": "node-waf configure build"
+	},
+	
+	"dependencies": {
+	  "binary": ">=0.1.9"
+	},
 	
 	"author": "Stefan Thomas <justmoon@members.fsf.org> (http://www.justmoon.net)",
 	
