@@ -10,6 +10,19 @@ library only contains the node, i.e. the P2P part of Bitcoin. Its
 intended use is as a server component to give lighter clients
 access to the data in the block chain (in real-time.)
 
+# Installation
+
+Installation via NPM:
+
+    npm install node-bitcoin-p2p
+
+Installation from git:
+
+    git clone git@github.com:justmoon/node-bitcoin-p2p.git
+    cd node-bitcoin-p2p
+    git submodule init --update
+    npm link
+
 # Usage
 
 Several examples on how to start up the library are provided in the
