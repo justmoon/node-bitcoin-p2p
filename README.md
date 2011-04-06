@@ -180,11 +180,11 @@ You can find more information on the Issues tab on Github.
 
 # Credits
 
-node-bitcoin-p2p - Node.js Bitcoin client
+node-bitcoin-p2p - Node.js Bitcoin client  
 Copyright (c) 2011 Stefan Thomas <justmoon@members.fsf.org>.
 
-Native extensions are
+Native extensions are  
 Copyright (c) 2011 Andrew Schaaf <andrew@andrewschaaf.com>
 
-Parts of this software are based on BitcoinJ
+Parts of this software are based on BitcoinJ  
 Copyright (c) 2011 Google Inc.
