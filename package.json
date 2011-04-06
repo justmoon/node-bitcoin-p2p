@@ -12,13 +12,17 @@
 	"scripts": {
 	  "install": "node-waf configure build"
 	},
-	
+
 	"dependencies": {
-	  "binary": ">=0.1.9"
+	  "binary": ">=0.1.9",
+	  "buffertools": ">=1.0.2",
+	  "bigint": ">=0.3.1",
+	  "winston": ">=0.2.6",
+	  "irc": ">=0.1.2"
 	},
-	
+
 	"author": "Stefan Thomas <justmoon@members.fsf.org> (http://www.justmoon.net)",
-	
+
 	"contributors": [
 		"Andrew Schaaf <andrew@andrewschaaf.com>",
 		"Mike Hearn <hearn@google.com>",
