@@ -10,15 +10,15 @@
 	],
 
 	"scripts": {
-	  "install": "node-waf configure build"
+		"install": "node-waf configure build"
 	},
 
 	"dependencies": {
-	  "binary": ">=0.1.9",
-	  "buffertools": ">=1.0.2",
-	  "bigint": ">=0.3.1",
-	  "winston": ">=0.2.6",
-	  "irc": ">=0.1.2"
+		"binary": ">=0.1.9",
+		"buffertools": ">=1.0.2",
+		"bigint": ">=0.3.1",
+		"winston": ">=0.2.6",
+		"irc": ">=0.1.2"
 	},
 
 	"author": "Stefan Thomas <justmoon@members.fsf.org> (http://www.justmoon.net)",
@@ -27,10 +27,10 @@
 		"Andrew Schaaf <andrew@andrewschaaf.com>",
 		"Mike Hearn <hearn@google.com>",
 		"Robert Kieffer <robert@broofa.com>"
-	]
+	],
 
-	"repository" : {
-		"type" : "git",
-		"url" : "https://justmoon@github.com/justmoon/node-bitcoin-p2p.git"
+	"repository": {
+		"type": "git",
+		"url": "https://justmoon@github.com/justmoon/node-bitcoin-p2p.git"
 	}
 }
