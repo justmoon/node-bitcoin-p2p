@@ -10,6 +10,19 @@ library only contains the node, i.e. the P2P part of Bitcoin. Its
 intended use is as a server component to give lighter clients
 access to the data in the block chain (in real-time.)
 
+# Prerequisites
+
+Please install a development version of the libgmp library. On
+Debian-based systems:
+
+    sudo aptitude install libgmp3-dev
+
+You also need to have MongoDB installed and running:
+
+    sudo aptitude install mongodb
+
+And of course you need to have [Node.js](http://nodejs.org/) and [npm](http://npmjs.org/) installed.
+
 # Installation
 
 Installation via NPM:
