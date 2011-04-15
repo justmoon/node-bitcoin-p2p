@@ -21,7 +21,11 @@ You also need to have MongoDB installed and running:
 
     sudo aptitude install mongodb
 
-And of course you need to have [Node.js](http://nodejs.org/) and [npm](http://npmjs.org/) installed.
+Make sure you have the latest build of [Node.js](http://nodejs.org/)
+from [github](https://github.com/joyent/node) installed. This library
+uses functionality introduced in Node.js 0.5.0.
+
+Finally, you need [npm](http://npmjs.org/).
 
 # Installation
 
@@ -35,6 +39,17 @@ Installation from git:
     cd node-bitcoin-p2p
     git submodule init --update
     npm link
+
+# Upgrading
+
+When upgrading node-bitcoin-p2p it is a good idea to reset its
+database:
+
+    mongo bitcoin --eval "db.dropDatabase()"
+
+This won't be necessary once node-bitcoin-p2p is more stable, but for
+now new versions often break database compatibility and since it only
+takes about ten minutes to regenerate it makes sense to just reset it.
 
 # Usage
 
