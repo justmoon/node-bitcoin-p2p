@@ -196,7 +196,6 @@ The library is currently alpha quality. Here are some things it
 currently lacks:
 
 - Correct handling of block chain splits
-- Verify outpoints for transaction inputs
 - Verify difficulty transitions
 - Accept incoming Bitcoin connections (optionally)
 - Store hashes etc. as MongoDB BinData instead of base64
