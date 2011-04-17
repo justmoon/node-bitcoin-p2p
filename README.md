@@ -35,9 +35,8 @@ Installation via NPM:
 
 Installation from git:
 
-    git clone git://github.com/justmoon/node-bitcoin-p2p.git
+    git clone git://github.com/justmoon/node-bitcoin-p2p.git --recursive
     cd node-bitcoin-p2p
-    git submodule init --update
     npm link
 
 # Upgrading
